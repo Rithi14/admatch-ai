@@ -17,7 +17,9 @@ from app.services.auditor import run_audit
 REPORT_DIR = ROOT / "reports"
 CSV_OUT = REPORT_DIR / "benchmark_results.csv"
 JSON_OUT = REPORT_DIR / "benchmark_results.json"
-LABELS_OUT = REPORT_DIR / "ground_truth_template.csv"
+REVIEW_OUT = REPORT_DIR / "ground_truth_review.csv"
+TEMPLATE_OUT = REPORT_DIR / "ground_truth_template.csv"
+REVIEW_COLUMNS = ["pair_id", "expected_mismatch", "review_notes", "reviewer"]
 
 
 def get_score(audit):
@@ -41,6 +43,62 @@ def get_score(audit):
     return None
 
 
+def _ensure_ground_truth_files(records):
+    """Keep human-entered review values while ensuring each dataset pair has a stable row."""
+    existing_rows = []
+    if REVIEW_OUT.exists():
+        with REVIEW_OUT.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            existing_rows = list(reader) if reader.fieldnames else []
+
+    existing_by_id = {}
+    for row in existing_rows:
+        pair_id = (row.get("pair_id") or "").strip()
+        if not pair_id or pair_id in existing_by_id:
+            continue
+        existing_by_id[pair_id] = row
+
+    dataset_ids = []
+    for row in records:
+        pair_id = (row.get("pair_id") or "").strip()
+        if pair_id:
+            dataset_ids.append(pair_id)
+
+    review_rows = []
+    for pair_id in dataset_ids:
+        source_row = existing_by_id.get(pair_id, {})
+        review_rows.append({
+            "pair_id": pair_id,
+            "expected_mismatch": (source_row.get("expected_mismatch") or "").strip(),
+            "review_notes": (source_row.get("review_notes") or "").strip(),
+            "reviewer": (source_row.get("reviewer") or "").strip(),
+        })
+
+    for pair_id, source_row in existing_by_id.items():
+        if pair_id in dataset_ids:
+            continue
+        review_rows.append({
+            "pair_id": pair_id,
+            "expected_mismatch": (source_row.get("expected_mismatch") or "").strip(),
+            "review_notes": (source_row.get("review_notes") or "").strip(),
+            "reviewer": (source_row.get("reviewer") or "").strip(),
+        })
+
+    for path in (REVIEW_OUT, TEMPLATE_OUT):
+        with path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=REVIEW_COLUMNS)
+            writer.writeheader()
+            for row in review_rows:
+                writer.writerow({
+                    "pair_id": row.get("pair_id", ""),
+                    "expected_mismatch": row.get("expected_mismatch", ""),
+                    "review_notes": row.get("review_notes", ""),
+                    "reviewer": row.get("reviewer", ""),
+                })
+
+    return review_rows
+
+
 def main():
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     records = load_dataset()
@@ -48,6 +106,7 @@ def main():
     if not records:
         raise SystemExit("ERROR: No dataset records loaded.")
 
+    review_rows = _ensure_ground_truth_files(records)
     results = []
     failures = []
 
@@ -171,27 +230,6 @@ def main():
         for result in results:
             writer.writerow({key: result.get(key, "") for key in columns})
 
-    # Empty expected labels are deliberate; a human must review and fill them.
-    if not LABELS_OUT.exists():
-        with LABELS_OUT.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(
-                handle,
-                fieldnames=[
-                    "pair_id",
-                    "expected_mismatch",
-                    "review_notes",
-                    "reviewer",
-                ],
-            )
-            writer.writeheader()
-            for row in records:
-                writer.writerow({
-                    "pair_id": row.get("pair_id", ""),
-                    "expected_mismatch": "",
-                    "review_notes": "",
-                    "reviewer": "",
-                })
-
     print("\n===== BENCHMARK SUMMARY =====")
     print(f"Dataset pairs:    {summary['dataset_pairs']}")
     print(f"Successful pairs: {summary['successful_pairs']}")
@@ -202,7 +240,8 @@ def main():
     print(f"Not found:        {summary['total_not_found']}")
     print(f"\nJSON report: {JSON_OUT}")
     print(f"CSV report:  {CSV_OUT}")
-    print(f"Label template: {LABELS_OUT}")
+    print(f"Ground-truth review: {REVIEW_OUT}")
+    print(f"Ground-truth template: {TEMPLATE_OUT}")
 
     if failures:
         raise SystemExit("Benchmark finished with failures; inspect the JSON report.")

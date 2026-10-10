@@ -1,21 +1,33 @@
 # AdMatch AI Backend
 
-A FastAPI-based backend for auditing ad-to-landing-page message consistency. The service compares an ad's claims against the actual landing page content, identifies missing or weak evidence, and returns a deterministic score, explanations, and recommendations.
+AdMatch AI is a transparent ad-to-landing-page audit backend designed to evaluate message consistency, surface unsupported claims, and produce explainable benchmark results for local review workflows.
 
-This backend powers a benchmark-focused workflow for evaluating message match quality using a local dataset of fictional ad/landing-page pairs. It is designed to be transparent, inspectable, and easy to run locally without depending on live external URLs.
+The backend is intentionally deterministic and evidence-first: it extracts ad claims, compares them against landing-page content, and reports what is supported, partially supported, or missing. It also supports a benchmark workflow for evaluating a fixed 60-pair dataset while preserving the human-reviewed ground truth as the final source of truth.
 
 ## Why this backend exists
 
-Marketing and ad quality teams often need to answer a simple but important question: does the landing page actually support the promises made in the ad?
+Marketing and ad quality teams need a defensible answer to a simple question:
 
-This API helps by:
+Does the landing page actually support the promises made in the ad?
 
-- extracting claims from ad text
-- retrieving or using local landing-page content
-- checking whether each claim is supported by evidence
-- calculating a message-match score
-- surfacing contradictions, fine-print issues, and recommendations
-- storing audit results in SQLite for review and troubleshooting
+This backend helps by:
+
+- extracting and normalizing claims from ad copy
+- analyzing landing-page snapshot text and structure
+- identifying evidence that supports or contradicts each claim
+- scoring message match quality with explainable findings
+- supporting benchmark evaluation using a local dataset
+- keeping human-reviewed labels separate from model-generated predictions
+
+## Core capabilities
+
+- FastAPI-based REST API for ad audits
+- deterministic claim extraction and evidence matching
+- local dataset benchmarking against `.example` landing-page snapshots
+- generation of benchmark result reports and evaluation metrics
+- review-ready ground-truth CSV workflow for human validation
+- explicit handling of blank, uncertain, and invalid labels
+- null-safe metric reporting when there is not enough human evidence
 
 ## Stack
 
@@ -27,7 +39,7 @@ This API helps by:
 - httpx
 - pytest
 
-## Project structure
+## Repository layout
 
 ```text
 backend/
@@ -62,8 +74,19 @@ backend/
 │   └── dataset/
 ├── docs/
 │   └── architecture.md
+├── reports/
+│   ├── benchmark_results.json
+│   ├── benchmark_results.csv
+│   ├── benchmark_metrics.json
+│   ├── benchmark_metrics.csv
+│   ├── ground_truth_review.csv
+│   └── ground_truth_template.csv
+├── scripts/
+│   ├── evaluate_benchmark.py
+│   └── run_benchmark.py
 ├── tests/
 │   ├── test_audit_api.py
+│   ├── test_benchmark_evaluation.py
 │   ├── test_evidence_validator.py
 │   └── test_scoring.py
 ├── .env.example
@@ -71,16 +94,6 @@ backend/
 ├── requirements.txt
 └── .gitignore
 ```
-
-## Features
-
-- Deterministic claim-to-page verification using extracted page text
-- Support for dataset-backed benchmark evaluation with local HTML snapshots
-- Optional pasted landing page text fallback for manual audits
-- Guarded URL fetching with strict rules for external page retrieval
-- SQLite-backed audit persistence
-- REST API with Swagger/OpenAPI docs via FastAPI
-- Transparency-focused scoring with evidence, findings, and recommendations
 
 ## Quick start
 
@@ -100,22 +113,20 @@ pip install -r requirements.txt
 
 ### 3) Configure environment variables
 
-Copy the example environment file if needed:
-
 ```bash
 cp .env.example .env
 ```
 
-The backend reads the following settings from environment variables or defaults:
+Common settings include:
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `ADMATCH_DATASET_DIR` | dataset directory for local benchmark pages | `backend/data/dataset` |
-| `ADMATCH_DATABASE_URL` | SQLite database path | `sqlite:///.../data/admatch.db` |
+| `ADMATCH_DATASET_DIR` | benchmark data directory | `backend/data/dataset` |
+| `ADMATCH_DATABASE_URL` | SQLite path | `sqlite:///.../data/admatch.db` |
 | `ADMATCH_CORS_ORIGINS` | allowed frontend origins | `http://localhost:5173,http://127.0.0.1:5173` |
-| `ADMATCH_REQUEST_TIMEOUT_SECONDS` | fetch timeout for remote page retrieval | `8` |
-| `ADMATCH_MAX_FETCH_BYTES` | cap for fetched page content | `2000000` |
-| `ADMATCH_MAX_PAGE_CHARS` | max page text length used in analysis | `200000` |
+| `ADMATCH_REQUEST_TIMEOUT_SECONDS` | HTTP timeout | `8` |
+| `ADMATCH_MAX_FETCH_BYTES` | fetch size cap | `2000000` |
+| `ADMATCH_MAX_PAGE_CHARS` | max page-text length | `200000` |
 
 ### 4) Run the API
 
@@ -123,10 +134,10 @@ The backend reads the following settings from environment variables or defaults:
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Then open:
+Useful local URLs:
 
 - API docs: http://localhost:8000/docs
-- Health check: http://localhost:8000/api/health
+- Health endpoint: http://localhost:8000/api/health
 - Dataset status: http://localhost:8000/api/dataset
 
 ## API overview
@@ -137,7 +148,7 @@ Then open:
 GET /api/health
 ```
 
-Returns service health plus dataset status.
+Returns service health and dataset availability.
 
 ### Dataset metadata
 
@@ -145,7 +156,7 @@ Returns service health plus dataset status.
 GET /api/dataset
 ```
 
-Returns the number of benchmark pairs and whether the dataset is available.
+Returns dataset shape and benchmark status metadata.
 
 ### Create audit
 
@@ -153,13 +164,13 @@ Returns the number of benchmark pairs and whether the dataset is available.
 POST /api/audits
 ```
 
-Creates an audit using:
+Creates a claim-audit evaluation using:
 
-- a live URL, if allowed and available
-- a local benchmark dataset match for fictional `.example` URLs
-- or pasted `landingPageText` when the page cannot be fetched
+- a live URL when permitted
+- a local benchmark snapshot for `.example` domains
+- or pasted `landingPageText` as a fallback
 
-Request body example:
+Example request:
 
 ```json
 {
@@ -174,98 +185,85 @@ Request body example:
 }
 ```
 
-### List audits
+### List and fetch audits
 
 ```http
 GET /api/audits
-```
-
-Returns stored audit summaries.
-
-### Fetch one audit
-
-```http
 GET /api/audits/{audit_id}
-```
-
-### Delete audits
-
-```http
 DELETE /api/audits/{audit_id}
 DELETE /api/audits
 ```
 
-## Audit response
+## Benchmark and evaluation workflow
 
-Each audit includes:
+The benchmark flow is built around a fixed dataset of ad and landing-page pairs. The canonical workflow is:
 
-- `id` and timestamps
-- input data from the request
-- `landingPage` metadata and page content summary
-- `score` from 0 to 100
-- `dimensions` with score breakdowns
-- `summary` of the overall match quality
-- `findings` for missing/weak/contradictory claims
-- `evidence` with matched or missing quotes
-- `recommendations` for improving message alignment
-- `contradictions` and `finePrint` sections
-- `issueSummary` for reporting aggregate issues
+```bash
+cd backend
+.venv/bin/python scripts/run_benchmark.py
+.venv/bin/python scripts/evaluate_benchmark.py
+```
 
-## How the audit works
+### Benchmark runner
 
-The backend follows a transparent pipeline:
+`backend/scripts/run_benchmark.py`:
 
-1. validate the incoming audit payload
-2. resolve landing page content from dataset, pasted text, or guarded remote fetch
-3. extract ad claims
-4. match claims against the landing page text and headings
-5. detect contradictions and fine print issues
-6. compute a score and recommendations
-7. persist the result to SQLite
+- loads benchmark records from the local dataset
+- audits each ad-to-page pair
+- writes `backend/reports/benchmark_results.json`
+- writes `backend/reports/benchmark_results.csv`
+- keeps `ground_truth_review.csv` stable while preserving any current human-reviewed values
 
-This is intentionally a deterministic evidence-based MVP rather than a legal or financial verification engine.
+### Evaluation script
 
-## Benchmark dataset
+`backend/scripts/evaluate_benchmark.py`:
 
-The project includes a static benchmark dataset for fictional ads and landing pages. This is useful for evaluating algorithmic performance without depending on live network conditions.
+- reads benchmark results and the human review CSV
+- validates pair IDs, duplicates, and invalid labels
+- excludes blank and uncertain labels from binary metric calculations
+- computes TP/FP/FN/TN, precision, recall, F1, and accuracy only from valid human-reviewed `true` / `false` values
+- writes `benchmark_metrics.json` and `benchmark_metrics.csv`
+- returns `awaiting_human_review` when there are not enough valid labels
 
-The dataset contains:
+Important: the benchmark output may produce a heuristic mismatch signal via `not_found_count > 0`, but this is never treated as definitive truth. It is a proxy only, not a substitute for human review.
 
-- ad metadata and copy fields
-- landing page snapshot HTML files
-- deterministic matching against `.example` URLs
+## Ground truth requirements
 
-This design keeps the benchmark reliable and reproducible.
+Human review remains the only valid source of benchmark labels. This backend intentionally enforces the following rules:
+
+- allowed values are `true`, `false`, `uncertain`, and blank
+- blank means not reviewed
+- `uncertain` is excluded from binary metrics and reported separately
+- `true` means at least one material mismatch was confirmed
+- `false` means no material mismatch was confirmed
+- model predictions are never used as ground truth
+- existing human-entered values are preserved when files are regenerated
 
 ## Testing
 
-Run the test suite with:
+Run the suite with:
 
 ```bash
-pytest
+cd backend
+.venv/bin/python -m pytest -q
 ```
 
-Key tests cover:
-
-- health endpoint contract
-- dataset metadata exposure
-- evidence validation behavior
-- scoring behavior
+The test suite covers API behavior, scoring logic, evidence validation, and the benchmark evaluation workflow, including edge cases such as zero denominators, invalid labels, duplicate IDs, and no-review scenarios.
 
 ## Security and guardrails
 
-The backend includes safeguards for external page fetching:
+The backend includes safeguards for network or dataset access:
 
-- restricted URL handling for safe public pages
-- redirect and fetch controls
-- byte limits on retrieved content
-- dataset path validation to avoid escapes outside the benchmark directory
+- restricted URL handling
+- fetch-size caps and timeout controls
+- dataset directory validation
+- explainable, local-first benchmarking without depending on live external systems
 
 ## Notes
 
-This project is best understood as a transparent scoring and evidence engine for ad-message alignment, not as a broad legal/financial compliance system. It is suited for local benchmarking, experimentation, and MVP validation workflows.
+This project is best understood as a transparent evidence engine for ad-message alignment and benchmark evaluation. It is suited for local experiments, reproducible QA workflows, and human-in-the-loop review pipelines.
 
 ## License
 
-This project is intended for internal evaluation and demo usage. Review the repository-level license before production deployment or redistribution.
+Review the repository-level license before production deployment or redistribution.
 

@@ -1,0 +1,2 @@
+status,reviewed_pairs,unreviewed_pairs,uncertain_pairs,tp,fp,fn,tn,precision,recall,f1_score,accuracy,prediction_rule
+awaiting_human_review,0,60,0,0,0,0,0,,,,,Predict a mismatch when not_found_count > 0 for a benchmark pair. This is a heuristic proxy based only on benchmark output and can flag a valid offer if the snapshot omits a claim or the page is incomplete.

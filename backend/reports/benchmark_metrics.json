@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-10-10T19:42:30.141566+00:00",
+  "benchmark_results": "/Users/rohitmahendran/Downloads/admatch-ai/backend/reports/benchmark_results.json",
+  "ground_truth_review": "/Users/rohitmahendran/Downloads/admatch-ai/backend/reports/ground_truth_review.csv",
+  "status": "awaiting_human_review",
+  "dataset_pairs": 60,
+  "review_summary": {
+    "reviewed_pairs": 0,
+    "unreviewed_pairs": 60,
+    "uncertain_pairs": 0,
+    "valid_reviewed_pairs": 0,
+    "invalid_label_count": 0,
+    "missing_in_review": [],
+    "unmatched_in_results": [],
+    "duplicate_pair_ids": []
+  },
+  "prediction_rule": "Predict a mismatch when not_found_count > 0 for a benchmark pair. This is a heuristic proxy based only on benchmark output and can flag a valid offer if the snapshot omits a claim or the page is incomplete.",
+  "confusion_matrix": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "tn": 0
+  },
+  "metrics": {
+    "true_positives": 0,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "true_negatives": 0,
+    "precision": null,
+    "recall": null,
+    "f1_score": null,
+    "accuracy": null,
+    "reviewed_pairs": 0,
+    "unreviewed_pairs": 60,
+    "uncertain_pairs": 0,
+    "total_valid_reviewed_pairs": 0
+  },
+  "validation_warnings": [],
+  "caveat": "These metrics use human-reviewed true/false pairs only and are a heuristic benchmark proxy, not definitive truth."
+}
