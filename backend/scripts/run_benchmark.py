@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 from app.services.dataset_loader import load_dataset
 from app.services.auditor import run_audit
+from scripts.prepare_ground_truth_review import generate_review_worksheet
 
 
 REPORT_DIR = ROOT / "reports"
@@ -242,6 +243,10 @@ def main():
     print(f"CSV report:  {CSV_OUT}")
     print(f"Ground-truth review: {REVIEW_OUT}")
     print(f"Ground-truth template: {TEMPLATE_OUT}")
+
+    worksheet_summary = generate_review_worksheet()
+    print(f"Review worksheet: {worksheet_summary['worksheet_path']}")
+    print(f"Review guide: {worksheet_summary['guide_path']}")
 
     if failures:
         raise SystemExit("Benchmark finished with failures; inspect the JSON report.")

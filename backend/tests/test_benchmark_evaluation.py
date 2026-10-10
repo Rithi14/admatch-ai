@@ -4,7 +4,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from app.services.dataset_loader import load_dataset
 import scripts.evaluate_benchmark as benchmark_eval
+import scripts.prepare_ground_truth_review as review_prep
 
 
 class BenchmarkEvaluationTests(unittest.TestCase):
@@ -159,6 +161,36 @@ class BenchmarkEvaluationTests(unittest.TestCase):
                 benchmark_eval.REVIEW_PATH = original_review_path
                 benchmark_eval.METRICS_JSON_PATH = original_metrics_json
                 benchmark_eval.METRICS_CSV_PATH = original_metrics_csv
+
+    def test_review_worksheet_contains_dataset_mapping_and_preserves_labels(self):
+        records = load_dataset()
+        review_rows = [
+            {"pair_id": "P01", "expected_mismatch": "false", "review_notes": "Looks supported", "reviewer": "alice"},
+            {"pair_id": "P02", "expected_mismatch": "", "review_notes": "", "reviewer": ""},
+        ]
+
+        worksheet_rows, validation = review_prep.build_review_worksheet_records(records, review_rows)
+        self.assertEqual(len(worksheet_rows), len(records))
+        self.assertEqual(worksheet_rows[0]["pair_id"], "P01")
+        self.assertIn("Rates From 6.9% APR", worksheet_rows[0]["ad_copy"])
+        self.assertIn("landing_page_excerpt", worksheet_rows[0])
+        self.assertEqual(worksheet_rows[0]["review_status"], "reviewed_false")
+        self.assertEqual(worksheet_rows[1]["review_status"], "unreviewed")
+        self.assertEqual(validation["warnings"], [])
+
+    def test_review_validation_rejects_invalid_label_and_unknown_pair(self):
+        valid_pair_ids = {f"P{i:02d}" for i in range(1, 4)}
+        review_rows = [
+            {"pair_id": "P01", "expected_mismatch": "maybe", "review_notes": "bad", "reviewer": "a"},
+            {"pair_id": "P03", "expected_mismatch": "true", "review_notes": "", "reviewer": ""},
+            {"pair_id": "P99", "expected_mismatch": "false", "review_notes": "ghost", "reviewer": "b"},
+            {"pair_id": "P01", "expected_mismatch": "false", "review_notes": "duplicate", "reviewer": "c"},
+        ]
+
+        validation = review_prep.validate_review_rows(review_rows, valid_pair_ids)
+        self.assertIn("maybe", [item["value"] for item in validation["invalid_labels"]])
+        self.assertIn("P99", validation["unknown_pair_ids"])
+        self.assertIn("P01", validation["duplicate_pair_ids"])
 
 
 if __name__ == "__main__":
