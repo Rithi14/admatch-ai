@@ -58,7 +58,7 @@ def main():
         try:
             html = snapshot.read_text(encoding="utf-8", errors="replace")
             # Keep each ad headline as a separate claim candidate.
-            headline = "\\n".join(
+            headline = "\n".join(
                 (row.get(f"headline_{i}") or "").strip()
                 for i in range(1, 4)
                 if (row.get(f"headline_{i}") or "").strip()
