@@ -192,6 +192,24 @@ class BenchmarkEvaluationTests(unittest.TestCase):
         self.assertIn("P99", validation["unknown_pair_ids"])
         self.assertIn("P01", validation["duplicate_pair_ids"])
 
+    def test_review_status_alias_and_duplicate_result_ids_are_handled(self):
+        result_rows = [
+            {"pair_id": "P01", "status": "success", "not_found_count": 1},
+            {"pair_id": "P01", "status": "success", "not_found_count": 0},
+            {"pair_id": "P02", "status": "success", "not_found_count": 0},
+            {"pair_id": "", "status": "success", "not_found_count": 1},
+        ]
+        review_rows = [
+            {"pair_id": "P01", "review_status": "true", "review_notes": "", "reviewer": "A"},
+            {"pair_id": "P02", "review_status": "false", "review_notes": "", "reviewer": "A"},
+        ]
+
+        metrics = benchmark_eval.evaluate_pair_predictions(result_rows, review_rows)
+        self.assertEqual(metrics["confusion_matrix"]["tp"], 1)
+        self.assertEqual(metrics["confusion_matrix"]["tn"], 1)
+        self.assertIn("duplicate_result_pair_id", [warning["type"] for warning in metrics["validation_warnings"]])
+        self.assertIn("missing_pair_id_in_results", [warning["type"] for warning in metrics["validation_warnings"]])
+
 
 if __name__ == "__main__":
     unittest.main()

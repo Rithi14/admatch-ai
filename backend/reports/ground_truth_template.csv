@@ -1,24 +1,24 @@
 pair_id,expected_mismatch,review_notes,reviewer
-P01,,,
-P02,,,
-P03,,,
-P04,,,
-P05,,,
-P06,,,
-P07,,,
-P08,,,
-P09,,,
-P10,,,
-P11,,,
-P12,,,
-P13,,,
-P14,,,
-P15,,,
-P16,,,
-P17,,,
-P18,,,
-P19,,,
-P20,,,
+P01,false,No material mismatch evident in supplied excerpt; verify complete snapshot.,provisional_review
+P02,false,Main advertised claims appear supported in supplied excerpt.,provisional_review
+P03,true,Ad promises up to $500K; page states up to $250K.,provisional_review
+P04,false,Main advertised claims appear supported in supplied excerpt.,provisional_review
+P05,true,Ad promises 100% equipment financing; page states 80% maximum and 20% down payment.,provisional_review
+P06,false,Main advertised claims appear supported in supplied excerpt.,provisional_review
+P07,true,Ad promises 100% financing and new/used equipment; page states 80% maximum and only approved-dealer new equipment.,provisional_review
+P08,true,Ad promises 100% financing; page states 80% maximum.,provisional_review
+P09,true,Guaranteed approval is not supported in supplied excerpt.,provisional_review
+P10,true,Guaranteed approval is not supported in supplied excerpt.,provisional_review
+P11,true,Page charges a 1% monthly maintenance fee on the full credit limit.,provisional_review
+P12,true,Guaranteed approval is not supported by the supplied page excerpt.,provisional_review
+P13,true,Ad promises funds within 24 hours; page says 5-7 business days after approval.,provisional_review
+P14,true,Ad says 3 months in business; page requires at least 12 months of sales history.,provisional_review
+P15,false,Main advertised claims appear supported by the supplied excerpt.,provisional_review
+P16,false,Main advertised claims appear supported by the supplied excerpt.,provisional_review
+P17,uncertain,25-year terms and low down payment are not established by the supplied excerpt; inspect the complete snapshot.,provisional_review
+P18,false,Main advertised claims appear supported by the supplied excerpt.,provisional_review
+P19,true,Ad claims a low down payment; page states down payments start at 25%. Subjective claim; verify context.,provisional_review
+P20,false,Main advertised claims appear supported by the supplied excerpt.,provisional_review
 P21,,,
 P22,,,
 P23,,,

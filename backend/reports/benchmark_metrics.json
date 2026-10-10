@@ -1,40 +1,53 @@
 {
-  "generated_at": "2026-10-10T19:54:52.699339+00:00",
+  "generated_at": "2026-10-10T20:18:29.428213+00:00",
   "benchmark_results": "/Users/rohitmahendran/Downloads/admatch-ai/backend/reports/benchmark_results.json",
   "ground_truth_review": "/Users/rohitmahendran/Downloads/admatch-ai/backend/reports/ground_truth_review.csv",
-  "status": "awaiting_human_review",
+  "status": "partial_review",
   "dataset_pairs": 60,
   "review_summary": {
-    "reviewed_pairs": 0,
-    "unreviewed_pairs": 60,
-    "uncertain_pairs": 0,
-    "valid_reviewed_pairs": 0,
+    "reviewed_pairs": 19,
+    "unreviewed_pairs": 40,
+    "uncertain_pairs": 1,
+    "valid_reviewed_pairs": 19,
     "invalid_label_count": 0,
     "missing_in_review": [],
     "unmatched_in_results": [],
-    "duplicate_pair_ids": []
+    "duplicate_pair_ids": [],
+    "positive_label_count": 11,
+    "negative_label_count": 8
   },
   "prediction_rule": "Predict a mismatch when not_found_count > 0 for a benchmark pair. This is a heuristic proxy based only on benchmark output and can flag a valid offer if the snapshot omits a claim or the page is incomplete.",
   "confusion_matrix": {
-    "tp": 0,
-    "fp": 0,
+    "tp": 11,
+    "fp": 8,
     "fn": 0,
     "tn": 0
   },
   "metrics": {
-    "true_positives": 0,
-    "false_positives": 0,
+    "true_positives": 11,
+    "false_positives": 8,
     "false_negatives": 0,
     "true_negatives": 0,
-    "precision": null,
-    "recall": null,
-    "f1_score": null,
-    "accuracy": null,
-    "reviewed_pairs": 0,
-    "unreviewed_pairs": 60,
-    "uncertain_pairs": 0,
-    "total_valid_reviewed_pairs": 0
+    "precision": 0.5789,
+    "recall": 1.0,
+    "f1_score": 0.7333,
+    "accuracy": 0.5789,
+    "reviewed_pairs": 19,
+    "unreviewed_pairs": 40,
+    "uncertain_pairs": 1,
+    "total_valid_reviewed_pairs": 19,
+    "positive_label_count": 11,
+    "negative_label_count": 8,
+    "single_class_reviewed": false,
+    "insufficient_evaluation": false
   },
   "validation_warnings": [],
+  "class_counts": {
+    "true": 11,
+    "false": 8,
+    "uncertain": 1,
+    "unreviewed": 40
+  },
+  "insufficient_evaluation": false,
   "caveat": "These metrics use human-reviewed true/false pairs only and are a heuristic benchmark proxy, not definitive truth."
 }

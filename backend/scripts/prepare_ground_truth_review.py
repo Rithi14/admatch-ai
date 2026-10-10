@@ -23,7 +23,25 @@ REQUIRED_REVIEW_COLUMNS = ["pair_id", "expected_mismatch", "review_notes", "revi
 def normalize_label(value) -> str:
     if value is None:
         return ""
-    return str(value).strip().lower()
+    normalized = str(value).strip().lower()
+    aliases = {
+        "reviewed_true": "true",
+        "reviewed_false": "false",
+        "reviewed_uncertain": "uncertain",
+        "yes": "true",
+        "y": "true",
+        "no": "false",
+        "n": "false",
+        "1": "true",
+        "0": "false",
+    }
+    return aliases.get(normalized, normalized)
+
+
+def _effective_label(row: dict) -> str:
+    if row.get("expected_mismatch") not in (None, ""):
+        return normalize_label(row.get("expected_mismatch"))
+    return normalize_label(row.get("review_status"))
 
 
 def _read_review_rows(path: Path) -> list[dict]:
@@ -37,9 +55,11 @@ def _read_review_rows(path: Path) -> list[dict]:
         for row in reader:
             if row is None:
                 continue
+            label_value = (row.get("expected_mismatch") or "").strip() or (row.get("review_status") or "").strip()
             rows.append({
                 "pair_id": (row.get("pair_id") or "").strip(),
-                "expected_mismatch": (row.get("expected_mismatch") or "").strip(),
+                "expected_mismatch": label_value,
+                "review_status": (row.get("review_status") or "").strip(),
                 "review_notes": (row.get("review_notes") or "").strip(),
                 "reviewer": (row.get("reviewer") or "").strip(),
             })
@@ -65,9 +85,10 @@ def _ensure_review_rows(records: Iterable[dict]) -> list[dict]:
     seen: set[str] = set()
     for pair_id in dataset_ids:
         source_row = existing_by_id.get(pair_id, {})
+        label_value = (source_row.get("expected_mismatch") or "").strip() or (source_row.get("review_status") or "").strip()
         review_rows.append({
             "pair_id": pair_id,
-            "expected_mismatch": (source_row.get("expected_mismatch") or "").strip(),
+            "expected_mismatch": label_value,
             "review_notes": (source_row.get("review_notes") or "").strip(),
             "reviewer": (source_row.get("reviewer") or "").strip(),
         })
@@ -76,9 +97,10 @@ def _ensure_review_rows(records: Iterable[dict]) -> list[dict]:
     for pair_id, source_row in existing_by_id.items():
         if pair_id in seen:
             continue
+        label_value = (source_row.get("expected_mismatch") or "").strip() or (source_row.get("review_status") or "").strip()
         review_rows.append({
             "pair_id": pair_id,
-            "expected_mismatch": (source_row.get("expected_mismatch") or "").strip(),
+            "expected_mismatch": label_value,
             "review_notes": (source_row.get("review_notes") or "").strip(),
             "reviewer": (source_row.get("reviewer") or "").strip(),
         })
@@ -117,10 +139,10 @@ def validate_review_rows(review_rows: list[dict], valid_pair_ids: set[str]) -> d
             continue
         seen.add(pair_id)
 
-        label = normalize_label(entry.get("expected_mismatch"))
+        label = _effective_label(entry)
         if label and label not in VALID_LABELS:
-            invalid_labels.append({"pair_id": pair_id, "value": entry.get("expected_mismatch")})
-            warnings.append(f"Pair {pair_id} has an invalid label: {entry.get('expected_mismatch')!r}.")
+            invalid_labels.append({"pair_id": pair_id, "value": entry.get("expected_mismatch") or entry.get("review_status")})
+            warnings.append(f"Pair {pair_id} has an invalid label: {entry.get('expected_mismatch') or entry.get('review_status')!r}.")
         if label and not (entry.get("reviewer") or "").strip():
             warnings.append(f"Pair {pair_id} has a review label but is missing a reviewer name.")
         if pair_id not in valid_pair_ids:
@@ -148,7 +170,7 @@ def build_review_worksheet_records(records: list[dict], review_rows: list[dict])
     for row in records:
         pair_id = str((row.get("pair_id") or "").strip())
         source_row = review_by_id.get(pair_id, {})
-        label = normalize_label(source_row.get("expected_mismatch"))
+        label = _effective_label(source_row)
         review_status = "unreviewed"
         if label == "true":
             review_status = "reviewed_true"
@@ -180,7 +202,7 @@ def build_review_worksheet_records(records: list[dict], review_rows: list[dict])
             "final_url": row.get("final_url", ""),
             "snapshot_file": row.get("snapshot_file", ""),
             "review_status": review_status,
-            "expected_mismatch": source_row.get("expected_mismatch", ""),
+            "expected_mismatch": (source_row.get("expected_mismatch") or source_row.get("review_status") or "").strip(),
             "reviewer": source_row.get("reviewer", ""),
             "review_notes": source_row.get("review_notes", ""),
             "ad_copy": ad_copy,

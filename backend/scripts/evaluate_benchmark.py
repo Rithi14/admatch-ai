@@ -24,6 +24,24 @@ PREDICTION_RULE = (
 )
 
 
+def _coerce_int(value, default: int = 0) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else default
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return default
+        try:
+            return int(cleaned)
+        except ValueError:
+            return default
+    return default
+
+
 def _safe_divide(numerator: float | int | None, denominator: float | int | None) -> float | None:
     if numerator is None or denominator in (None, 0):
         return None
@@ -33,7 +51,25 @@ def _safe_divide(numerator: float | int | None, denominator: float | int | None)
 def _normalize_label(value):
     if value is None:
         return ""
-    return str(value).strip().lower()
+    normalized = str(value).strip().lower()
+    if normalized in {"", "none", "null"}:
+        return ""
+    aliases = {
+        "reviewed_true": "true",
+        "reviewed_false": "false",
+        "reviewed_uncertain": "uncertain",
+        "yes": "true",
+        "y": "true",
+        "no": "false",
+        "n": "false",
+        "1": "true",
+        "0": "false",
+    }
+    return aliases.get(normalized, normalized)
+
+
+def _effective_label(row: dict) -> str:
+    return _normalize_label(row.get("expected_mismatch") if (row.get("expected_mismatch") or "").strip() else row.get("review_status"))
 
 
 def _ensure_review_rows(result_pair_ids: list[str] | set[str] | None = None) -> list[dict]:
@@ -59,7 +95,16 @@ def _ensure_review_rows(result_pair_ids: list[str] | set[str] | None = None) -> 
                     normalized["pair_id"] = ""
                     rows.append(normalized)
                     continue
-                rows.append({col: (normalized.get(col) or "") for col in REQUIRED_REVIEW_COLUMNS})
+                value = (normalized.get("expected_mismatch") or "").strip()
+                if not value:
+                    value = (normalized.get("review_status") or "").strip()
+                normalized["expected_mismatch"] = value
+                rows.append({
+                    "pair_id": pair_id,
+                    "expected_mismatch": normalized.get("expected_mismatch", ""),
+                    "review_notes": (normalized.get("review_notes") or "").strip(),
+                    "reviewer": (normalized.get("reviewer") or "").strip(),
+                })
     else:
         rows = []
 
@@ -83,12 +128,12 @@ def _validate_review_rows(review_rows: list[dict], result_pair_ids: set[str]) ->
         pair_counts[pair_id] += 1
         review_pair_ids.add(pair_id)
 
-        label = _normalize_label(row.get("expected_mismatch"))
+        label = _effective_label(row)
         if label and label not in VALID_LABELS:
             warnings.append({
                 "type": "invalid_label",
                 "pair_id": pair_id,
-                "value": row.get("expected_mismatch"),
+                "value": row.get("expected_mismatch") or row.get("review_status"),
                 "message": "Label is not in the allowed set: true, false, uncertain, or blank.",
             })
 
@@ -126,6 +171,47 @@ def _validate_review_rows(review_rows: list[dict], result_pair_ids: set[str]) ->
     }
 
 
+def _validate_result_rows(result_rows: list[dict]) -> dict:
+    warnings: list[dict] = []
+    pair_counts = Counter()
+    unique_rows: list[dict] = []
+    unique_pair_ids: set[str] = set()
+
+    for entry in result_rows:
+        if not isinstance(entry, dict):
+            warnings.append({"type": "invalid_result_row", "message": "Non-dict benchmark result encountered."})
+            continue
+
+        pair_id = str(entry.get("pair_id") or "").strip()
+        if not pair_id:
+            warnings.append({"type": "missing_pair_id_in_results", "message": "A benchmark result row is missing a pair_id."})
+            continue
+
+        pair_counts[pair_id] += 1
+        if pair_id in unique_pair_ids:
+            warnings.append({
+                "type": "duplicate_result_pair_id",
+                "pair_id": pair_id,
+                "message": "Duplicate pair_id found in benchmark results; keeping the first valid row.",
+            })
+            continue
+
+        unique_pair_ids.add(pair_id)
+        unique_rows.append({
+            "pair_id": pair_id,
+            "status": entry.get("status"),
+            "not_found_count": _coerce_int(entry.get("not_found_count"), 0),
+        })
+
+    return {
+        "warnings": warnings,
+        "pair_counts": pair_counts,
+        "unique_rows": unique_rows,
+        "pair_ids": unique_pair_ids,
+        "duplicate_pair_ids": sorted(pair_id for pair_id, count in pair_counts.items() if count > 1),
+    }
+
+
 def _deduplicate_review_rows(review_rows: list[dict]) -> list[dict]:
     deduped: list[dict] = []
     seen: set[str] = set()
@@ -136,9 +222,10 @@ def _deduplicate_review_rows(review_rows: list[dict]) -> list[dict]:
             continue
         if pair_id in seen:
             continue
+        effective_label = _effective_label(row)
         deduped.append({
             "pair_id": pair_id,
-            "expected_mismatch": row.get("expected_mismatch", "") or "",
+            "expected_mismatch": effective_label,
             "review_notes": row.get("review_notes", "") or "",
             "reviewer": row.get("reviewer", "") or "",
         })
@@ -147,31 +234,27 @@ def _deduplicate_review_rows(review_rows: list[dict]) -> list[dict]:
 
 
 def evaluate_pair_predictions(result_rows: list[dict], review_rows: list[dict]) -> dict:
-    result_pairs = []
-    for row in result_rows:
-        if not isinstance(row, dict):
-            continue
-        pair_id = str(row.get("pair_id") or "").strip()
-        if not pair_id:
-            continue
-        result_pairs.append({"pair_id": pair_id, "status": row.get("status"), "not_found_count": row.get("not_found_count", 0)})
+    result_validation = _validate_result_rows(result_rows)
+    warnings = result_validation["warnings"]
+    result_pairs = result_validation["unique_rows"]
     by_pair = {entry["pair_id"]: entry for entry in result_pairs}
     result_pair_ids = set(by_pair)
 
     validation = _validate_review_rows(review_rows, result_pair_ids)
+    warnings.extend(validation["warnings"])
     deduped_review_rows = _deduplicate_review_rows(review_rows)
-    warnings = validation["warnings"]
 
     tp = fp = fn = tn = 0
-    valid_reviewed = 0
     unreviewed = 0
     uncertain = 0
     reviewed_pairs = 0
     invalid_labels = []
+    true_labels = 0
+    false_labels = 0
 
     for row in deduped_review_rows:
         pair_id = (row.get("pair_id") or "").strip()
-        label = _normalize_label(row.get("expected_mismatch"))
+        label = _effective_label(row)
 
         if not pair_id:
             continue
@@ -185,7 +268,7 @@ def evaluate_pair_predictions(result_rows: list[dict], review_rows: list[dict]) 
             continue
 
         if label not in {"true", "false"}:
-            invalid_labels.append({"pair_id": pair_id, "value": row.get("expected_mismatch")})
+            invalid_labels.append({"pair_id": pair_id, "value": row.get("expected_mismatch") or row.get("review_status")})
             continue
 
         result = by_pair.get(pair_id)
@@ -198,8 +281,11 @@ def evaluate_pair_predictions(result_rows: list[dict], review_rows: list[dict]) 
             continue
 
         reviewed_pairs += 1
-        valid_reviewed += 1
         actual = label == "true"
+        if actual:
+            true_labels += 1
+        else:
+            false_labels += 1
         predicted = int((result.get("not_found_count") or 0) > 0)
 
         if predicted and actual:
@@ -226,6 +312,9 @@ def evaluate_pair_predictions(result_rows: list[dict], review_rows: list[dict]) 
     if reviewed_pairs > 0:
         status = "partial_review" if reviewed_pairs < len(result_pairs) else "ready"
 
+    single_class = (true_labels == 0 and false_labels > 0) or (false_labels == 0 and true_labels > 0)
+    insufficient_evaluation = total_valid == 0 or single_class
+
     metrics = {
         "evaluation_unit": "ad_landing_page_pair",
         "prediction_rule": PREDICTION_RULE,
@@ -249,6 +338,10 @@ def evaluate_pair_predictions(result_rows: list[dict], review_rows: list[dict]) 
             "unreviewed_pairs": unreviewed,
             "uncertain_pairs": uncertain,
             "total_valid_reviewed_pairs": total_valid,
+            "positive_label_count": true_labels,
+            "negative_label_count": false_labels,
+            "single_class_reviewed": single_class,
+            "insufficient_evaluation": insufficient_evaluation,
         },
         "review_summary": {
             "reviewed_pairs": reviewed_pairs,
@@ -259,9 +352,18 @@ def evaluate_pair_predictions(result_rows: list[dict], review_rows: list[dict]) 
             "missing_in_review": validation["missing_in_review"],
             "unmatched_in_results": validation["unmatched_in_results"],
             "duplicate_pair_ids": validation["duplicate_pair_ids"],
+            "positive_label_count": true_labels,
+            "negative_label_count": false_labels,
         },
         "validation_warnings": warnings,
         "invalid_labels": invalid_labels,
+        "class_counts": {
+            "true": true_labels,
+            "false": false_labels,
+            "uncertain": uncertain,
+            "unreviewed": unreviewed,
+        },
+        "insufficient_evaluation": insufficient_evaluation,
     }
     return metrics
 
@@ -270,7 +372,10 @@ def _load_results() -> dict:
     if not RESULTS_PATH.exists():
         raise FileNotFoundError(f"Benchmark results not found: {RESULTS_PATH}")
     with RESULTS_PATH.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+        payload = json.load(handle)
+    if not isinstance(payload, dict):
+        raise ValueError(f"Benchmark results at {RESULTS_PATH} must contain a JSON object.")
+    return payload
 
 
 def _write_metrics_csv(report: dict) -> None:
@@ -300,8 +405,8 @@ def generate_evaluation_report() -> dict:
         raise FileNotFoundError(f"Run the benchmark first: {RESULTS_PATH}")
 
     report = _load_results()
-    result_rows = report.get("results", [])
-    review_rows = _ensure_review_rows([str(row.get("pair_id") or "").strip() for row in result_rows if str(row.get("pair_id") or "").strip()])
+    result_rows = report.get("results", []) if isinstance(report.get("results", []), list) else []
+    review_rows = _ensure_review_rows([str(row.get("pair_id") or "").strip() for row in result_rows if isinstance(row, dict) and str(row.get("pair_id") or "").strip()])
     metrics = evaluate_pair_predictions(result_rows, review_rows)
 
     output = {
@@ -315,6 +420,8 @@ def generate_evaluation_report() -> dict:
         "confusion_matrix": metrics["confusion_matrix"],
         "metrics": metrics["metrics"],
         "validation_warnings": metrics["validation_warnings"],
+        "class_counts": metrics["class_counts"],
+        "insufficient_evaluation": metrics["insufficient_evaluation"],
         "caveat": "These metrics use human-reviewed true/false pairs only and are a heuristic benchmark proxy, not definitive truth.",
     }
 
