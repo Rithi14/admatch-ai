@@ -19,6 +19,7 @@ import MatchScore from '../components/audit/MatchScore';
 import ScoreBreakdown from '../components/audit/ScoreBreakdown';
 import FindingsPanel from '../components/audit/FindingsPanel';
 import EvidenceList from '../components/audit/EvidenceList';
+import ProofGraph from '../components/audit/ProofGraph'; // ADDED IMPORT
 import RecommendationCenter from '../components/audit/RecommendationCenter';
 import AnalysisNotice from '../components/audit/AnalysisNotice';
 import { getScoreCategory, GOALS } from '../utils/constants';
@@ -30,6 +31,7 @@ const SECTIONS = [
   { id: 'breakdown', label: 'Score breakdown' },
   { id: 'findings', label: 'Key findings' },
   { id: 'evidence', label: 'Evidence' },
+  { id: 'proof-graph', label: 'ProofGraph' }, // ADDED TO NAVIGATION
   { id: 'recommendations', label: 'Recommendations' },
   { id: 'details', label: 'Details' },
 ];
@@ -162,7 +164,7 @@ export default function AuditReport() {
   const handleDelete = async () => {
     const ok = await confirm({
       title: 'Delete this audit?',
-      message: `“${audit.input.headline}” and its recommendation progress will be permanently removed. Export it first if you want a copy.`,
+      message: `"${audit.input.headline}" and its recommendation progress will be permanently removed. Export it first if you want a copy.`,
       confirmLabel: 'Delete audit',
     });
     if (!ok) return;
@@ -253,6 +255,14 @@ export default function AuditReport() {
           Evidence and mismatches
         </h2>
         <EvidenceList evidence={audit.evidence} />
+      </section>
+
+      {/* ADDED PROOF GRAPH SECTION HERE */}
+      <section className="card" id="proof-graph" aria-labelledby="proof-graph-title">
+        <h2 className="section-title" id="proof-graph-title">
+          ProofGraph — Visual Evidence Locator
+        </h2>
+        <ProofGraph graph={audit.proofGraph} />
       </section>
 
       <section className="card" id="recommendations" aria-labelledby="reco-title">

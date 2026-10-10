@@ -9,6 +9,7 @@ from app.services.evidence_validator import find_evidence
 from app.services.recommendations import build_recommendations
 from app.services.scoring import score_audit
 from app.services.contradiction_detector import detect_issues
+from app.services.proof_graph import build_proof_graph
 
 
 def _severity(claim: str) -> str:
@@ -113,6 +114,7 @@ def run_audit(
                 "claim": claim,
                 "evidence": result["evidence"],
                 "verified": verified,
+                "location": result.get("location", "unknown"),
                 "finding": finding,
                 "severity": severity,
                 "explanation": (
@@ -195,6 +197,10 @@ def run_audit(
 
     contradictions = issue_results["contradictions"]
     fine_print = issue_results["finePrint"]
+    proof_graph = build_proof_graph(
+    evidence,
+    sections,
+)
 
     # Step 8: Add contradiction findings.
     for item in contradictions:
@@ -278,6 +284,7 @@ def run_audit(
         "contradictions": contradictions,
         "finePrint": fine_print,
         "issueSummary": issue_results["summary"],
+        "proofGraph": proof_graph,
 
         "analysis": {
             "engine": "deterministic-evidence-mvp",
