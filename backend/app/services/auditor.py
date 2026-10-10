@@ -22,7 +22,13 @@ def run_audit(payload, page_html: str | None = None, source: str = "pasted", dat
     claims = extract_claims(payload.headline, payload.body, payload.cta)
     evidence = []
     for i, claim in enumerate(claims, 1):
-        result = find_evidence(claim, page_text, page.get("headings"))
+       
+        result = find_evidence(
+    claim,
+    page_text,
+    page.get("headings"),
+    page.get("sections"),
+)
         verified = result["verified"]
         severity = _severity(claim)
         if verified == "found":
@@ -66,7 +72,7 @@ def run_audit(payload, page_html: str | None = None, source: str = "pasted", dat
                   "audience": payload.audience or "", "goal": payload.goal or "", "industry": payload.industry or ""},
         "landingPage": {"url": url, "hostname": "", "contentSource": source if page_text else "none",
                         "content": page_text, "wordCount": len(page_text.split()), "title": page.get("title", ""),
-                        "headings": page.get("headings", []), **({"datasetPairId": dataset_match["pair_id"], "datasetMatchConfidence": dataset_match["match_confidence"]} if dataset_match else {})},
+                        "headings": page.get("headings", []),"sections": page.get("sections", []), **({"datasetPairId": dataset_match["pair_id"], "datasetMatchConfidence": dataset_match["match_confidence"]} if dataset_match else {})},
         "score": score, "dimensions": dimensions,
         "summary": summary,
         "findings": findings, "evidence": evidence, "recommendations": recommendations,
