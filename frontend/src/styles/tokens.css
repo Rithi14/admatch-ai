@@ -1,0 +1,44 @@
+/* Design tokens – dark navy / charcoal surfaces with cyan and purple accents.
+   Text/background pairs below were chosen to meet WCAG AA contrast (4.5:1). */
+:root {
+  color-scheme: dark;
+
+  --bg: #080d1a;
+  --surface: #101829;
+  --surface-2: #152036;
+  --surface-3: #1b2a45;
+  --border: #25334f;
+  --border-strong: #3a4d75;
+
+  --text: #f4f7ff;
+  --muted: #a6b4d1;
+  --faint: #8494b5;
+
+  --cyan: #22d3ee;
+  --blue: #6aa8ff;
+  --purple: #8b7cf6;
+  --violet: #b4a8ff;
+  --on-accent: #04121f;
+  --gradient: linear-gradient(135deg, #22d3ee 0%, #6aa8ff 55%, #8b7cf6 100%);
+  --gradient-soft: linear-gradient(135deg, rgba(34, 211, 238, 0.14), rgba(139, 124, 246, 0.14));
+
+  --high: #ff8da1;
+  --high-bg: rgba(255, 99, 130, 0.14);
+  --medium: #fbbf24;
+  --medium-bg: rgba(251, 191, 36, 0.13);
+  --low: #8cc1ff;
+  --low-bg: rgba(106, 168, 255, 0.14);
+  --good: #4ade9f;
+  --good-bg: rgba(74, 222, 159, 0.13);
+  --excellent: #22d3ee;
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.38);
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.28);
+  --glow: 0 0 0 1px rgba(34, 211, 238, 0.28), 0 10px 34px rgba(34, 211, 238, 0.14);
+
+  --sidebar-w: 260px;
+  --topbar-h: 68px;
+  --ease: cubic-bezier(0.22, 0.8, 0.3, 1);
+}

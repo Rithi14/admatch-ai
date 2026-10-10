@@ -1,0 +1,82 @@
+/* Print layout for audit reports: light, ink-friendly, chrome hidden. */
+@media print {
+  :root {
+    color-scheme: light;
+    --bg: #fff;
+    --surface: #fff;
+    --surface-2: #f5f7fb;
+    --surface-3: #e8edf6;
+    --border: #cfd6e4;
+    --border-strong: #b3bdd1;
+    --text: #111827;
+    --muted: #374151;
+    --faint: #4b5563;
+    --cyan: #0e7490;
+    --high: #b91c1c;
+    --medium: #92400e;
+    --low: #1d4ed8;
+    --good: #166534;
+    --high-bg: #fee2e2;
+    --medium-bg: #fef3c7;
+    --low-bg: #dbeafe;
+    --good-bg: #dcfce7;
+  }
+  body {
+    background: #fff !important;
+    color: #111827;
+    font-size: 12px;
+  }
+  .sidebar,
+  .sidebar-overlay,
+  .topbar,
+  .skip-link,
+  .toaster,
+  .no-print,
+  .report-toolbar,
+  .section-nav,
+  .reco-filters,
+  .reco-check,
+  .infotip,
+  .icon-btn,
+  .btn,
+  .chip-btn {
+    display: none !important;
+  }
+  .main-area {
+    margin-left: 0 !important;
+  }
+  .page {
+    max-width: none;
+    padding: 0;
+    animation: none;
+  }
+  .card,
+  .evidence-card,
+  .reco-item,
+  .finding-group {
+    box-shadow: none !important;
+    background: #fff !important;
+    break-inside: avoid;
+  }
+  .report-top {
+    grid-template-columns: 200px 1fr;
+  }
+  .evidence-cols {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ring-track {
+    stroke: #e5e7eb;
+  }
+  .bar,
+  .bar-fill {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .page-text {
+    max-height: none;
+    overflow: visible;
+  }
+  a {
+    text-decoration: underline;
+  }
+}
