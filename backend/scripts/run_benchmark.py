@@ -26,6 +26,11 @@ def get_score(audit):
         value = audit.get(key)
         if isinstance(value, (int, float)):
             return value
+
+    direct_score = audit.get("score")
+    if isinstance(direct_score, (int, float)):
+        return direct_score
+
     for key in ("score", "scores", "scoreBreakdown", "score_breakdown"):
         value = audit.get(key)
         if isinstance(value, dict):
@@ -52,9 +57,11 @@ def main():
 
         try:
             html = snapshot.read_text(encoding="utf-8", errors="replace")
-            headline = " ".join(
+            # Keep each ad headline as a separate claim candidate.
+            headline = "\\n".join(
                 (row.get(f"headline_{i}") or "").strip()
                 for i in range(1, 4)
+                if (row.get(f"headline_{i}") or "").strip()
             ).strip()
             body = " ".join(
                 (row.get(f"description_{i}") or "").strip()
