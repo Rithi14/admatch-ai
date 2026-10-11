@@ -806,7 +806,21 @@
   .section-nav {
     border-radius: var(--radius-sm);
   }
-  /* ProofGraph */
+}
+
+/* ProofGraph */
+.proof-graph-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.proof-graph-intro {
+  margin: 0;
+  color: var(--text-secondary, #9ca3af);
+  line-height: 1.6;
+}
+
 .proof-graph {
   display: flex;
   flex-direction: column;
@@ -933,7 +947,12 @@
 
 .proof-graph-status.status-not_found,
 .proof-graph-status.status-unknown {
-  color: #f87171;
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.proof-graph-status.status-contradicted {
+  color: #fca5a5;
   background: rgba(239, 68, 68, 0.12);
 }
 
@@ -980,5 +999,4 @@
   .proof-graph-node {
     padding: 12px;
   }
-}
 }

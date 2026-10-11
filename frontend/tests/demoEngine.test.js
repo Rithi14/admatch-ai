@@ -53,6 +53,23 @@ test('result is always labelled as demo and unverified', () => {
   assert.equal(n.mode, 'demo');
 });
 
+test('demo results include keyword-matched proof graph connections', () => {
+  const a = runDemoAnalysis({
+    ...base,
+    headline: 'Save 50% on running shoes',
+    pageText: 'Save 50% on running shoes today.',
+  });
+  const graph = normalizeAudit(a, { defaultMode: 'demo' }).proofGraph;
+
+  assert.equal(graph.summary.claimCount, a.evidence.length);
+  assert.equal(graph.summary.sectionCount, 1);
+  assert.ok(graph.nodes.some((node) => node.type === 'claim'));
+  assert.ok(graph.nodes.some((node) => node.type === 'evidence'));
+  assert.ok(graph.edges.some((edge) => edge.type === 'supported_by'));
+  assert.ok(graph.edges.some((edge) => edge.type === 'located_in'));
+  assert.equal(a.analysis.verified, false);
+});
+
 test('evidence quotes are never invented: every quote appears in the page text', () => {
   for (const ex of Object.values(EXAMPLE_INPUTS)) {
     const input = { ...base, ...ex, url: ex.url || base.url };

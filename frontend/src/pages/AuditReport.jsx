@@ -262,7 +262,7 @@ export default function AuditReport() {
         <h2 className="section-title" id="proof-graph-title">
           ProofGraph — Visual Evidence Locator
         </h2>
-        <ProofGraph graph={audit.proofGraph} />
+        <ProofGraph graph={audit.proofGraph} mode={audit.mode} />
       </section>
 
       <section className="card" id="recommendations" aria-labelledby="reco-title">
