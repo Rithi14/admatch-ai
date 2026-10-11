@@ -361,6 +361,74 @@ const average = (parts) => {
   return usable.length ? usable.reduce((a, b) => a + b, 0) / usable.length : null;
 };
 
+function buildDemoProofGraph(evidence, pageText) {
+  const sectionId = 'section-1';
+  const nodes = [{
+    id: sectionId,
+    type: 'section',
+    label: 'Landing Page Content',
+    text: pageText,
+  }];
+  const edges = [];
+
+  evidence.forEach((item, index) => {
+    const claimId = `claim-${index + 1}`;
+    const verified = String(item.verified || 'unable').toLowerCase();
+    const quote = typeof item.evidence === 'string' ? item.evidence.trim() : '';
+    let status = 'not_found';
+
+    if (verified === 'found' || verified === 'verified') {
+      status = 'found';
+    } else if (verified === 'partial' || verified === 'partially_supported') {
+      status = 'partial';
+    } else if (verified === 'unable') {
+      status = 'unknown';
+    }
+
+    nodes.push({
+      id: claimId,
+      type: 'claim',
+      label: item.claim || `Claim ${index + 1}`,
+      status,
+    });
+
+    if (!quote || (status !== 'found' && status !== 'partial')) return;
+
+    const evidenceId = `evidence-${index + 1}`;
+    nodes.push({
+      id: evidenceId,
+      type: 'evidence',
+      label: clip(quote, 120),
+      text: quote,
+      status,
+    });
+    edges.push({
+      source: claimId,
+      target: evidenceId,
+      type: status === 'partial' ? 'partially_supported_by' : 'supported_by',
+    });
+
+    if (pageText.includes(quote)) {
+      edges.push({
+        source: evidenceId,
+        target: sectionId,
+        type: 'located_in',
+      });
+    }
+  });
+
+  return {
+    nodes,
+    edges,
+    summary: {
+      claimCount: nodes.filter((node) => node.type === 'claim').length,
+      evidenceCount: nodes.filter((node) => node.type === 'evidence').length,
+      sectionCount: nodes.filter((node) => node.type === 'section').length,
+      connectionCount: edges.length,
+    },
+  };
+}
+
 export function runDemoAnalysis(input, { now = new Date(), id } = {}) {
   const pageText = (input.pageText || '').trim();
   const page = buildPage(pageText);
@@ -612,6 +680,7 @@ export function runDemoAnalysis(input, { now = new Date(), id } = {}) {
     contradicted: allItems.filter((r) => r.status === 'contradicted').length,
   };
   const summary = `Demo keyword analysis of ${allItems.length} ad item${allItems.length === 1 ? '' : 's'}: ${counts.supported} supported, ${counts.weak} weakly supported, ${counts.missing} missing and ${counts.contradicted} contradicted. This score is an illustration based on word matching, not a verified AI judgement.`;
+  const proofGraph = buildDemoProofGraph(evidence, pageText);
 
   let hostname = '';
   try {
@@ -648,6 +717,7 @@ export function runDemoAnalysis(input, { now = new Date(), id } = {}) {
     summary,
     findings,
     evidence,
+    proofGraph,
     recommendations,
     analysis: {
       engine: 'demo-keyword',
