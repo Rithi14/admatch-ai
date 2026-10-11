@@ -1,20 +1,36 @@
-import { useCallback, useState } from 'react'
+import { createElement, useCallback, useRef, useState } from 'react';
+import ConfirmDialog from '../components/common/ConfirmDialog';
 
+/**
+ * Promise-based confirmation dialog.
+ */
 export function useConfirm() {
-const [dialog, setDialog] = useState(null)
+  const [options, setOptions] = useState(null);
+  const resolver = useRef(null);
 
-const confirm = useCallback((options = {}) => {
-const message =
-typeof options === 'string'
-? options
-: options.message || 'Are you sure you want to continue?'
+  const confirm = useCallback(
+    (opts) =>
+      new Promise((resolve) => {
+        resolver.current = resolve;
+        setOptions(opts);
+      }),
+    [],
+  );
 
-```
-const accepted = window.confirm(message)
-return Promise.resolve(accepted)
-```
+  const close = useCallback((result) => {
+    resolver.current?.(result);
+    resolver.current = null;
+    setOptions(null);
+  }, []);
 
-}, [])
+  const confirmDialog = createElement(ConfirmDialog, {
+    open: Boolean(options),
+    ...(options || {}),
+    onConfirm: () => close(true),
+    onCancel: () => close(false),
+  });
 
-return { confirm, isOpen: Boolean(dialog), dialog, setDialog }
+  return { confirm, confirmDialog };
 }
+
+export default useConfirm;
